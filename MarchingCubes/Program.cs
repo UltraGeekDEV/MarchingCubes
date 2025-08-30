@@ -7,6 +7,7 @@ using MarchingCubes.Utils;
 using MarchingCubes.Shaders;
 using MarchingCubes.Rendering;
 using System.Drawing;
+using MarchingCubes.CPUMarchingCubes;
 
 namespace MarchingCubes
 {
@@ -18,10 +19,9 @@ namespace MarchingCubes
         {
             Init();
 
-            var Cube = new Mesh(MaterialID.Solid, GetCube());
-            Cube.transform = Matrix4.CreateFromQuaternion(Quaternion.FromEulerAngles(45, 45, 45));
+            var mesh = new Mesh(MaterialID.Solid, CPUMesher.GetTriangles(48));
 
-            SolidMeshes.Add(Cube);
+            SolidMeshes.Add(mesh);
 
             var camera = new Camera();
             Vector3 cameraPos = new Vector3(-2, 2, 0);
@@ -43,7 +43,7 @@ namespace MarchingCubes
                 };
                 window.RenderFrame += (FrameEventArgs args) =>
                 {
-                    Cube.transform = Matrix4.CreateRotationY((((DateTime.Now.Second + DateTime.Now.Millisecond / 1000.0f) / 60.0f * 4.0f) % 1.0f) * MathF.PI);
+                    mesh.transform = Matrix4.CreateRotationY((((DateTime.Now.Second + DateTime.Now.Millisecond / 1000.0f) / 60.0f * 4.0f) % 1.0f) *2* MathF.PI);
 
                     while (actionQueue.TryDequeue(out var action))
                     {

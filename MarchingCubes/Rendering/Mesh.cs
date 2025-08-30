@@ -24,11 +24,9 @@ namespace MarchingCubes.Rendering
         public Mesh(MaterialID material, List<Triangle> tris)
         {
             transform = Matrix4.Identity;
-            var vertices = tris.SelectMany(tri =>
-            {
-                var normal = Vector3.Cross(tri.b - tri.a, tri.c - tri.a).Normalized();
-                return new Vector3[] { tri.a, normal, tri.b, normal, tri.c, normal };
-            }).SelectMany(vert => new float[] { vert.X, vert.Y, vert.Z }).ToArray();
+            var vertices =  tris.SelectMany(tri => new Vector3[] { tri.a, tri.normA, tri.b, tri.normB, tri.c, tri.normC })
+                                .SelectMany(vert => new float[] { vert.X, vert.Y, vert.Z }).ToArray();
+
             this.material = Materials.materials[material];
             triCount = tris.Count * 3;
 
