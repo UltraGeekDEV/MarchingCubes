@@ -13,12 +13,15 @@ namespace MarchingCubes
     internal class Program
     {
         public static ConcurrentQueue<Action> actionQueue = new ConcurrentQueue<Action>();
+        public static List<Mesh> SolidMeshes = new List<Mesh>();
         static void Main(string[] args)
         {
             Init();
 
             var Cube = new Mesh(MaterialID.Solid, GetCube());
             Cube.transform = Matrix4.CreateFromQuaternion(Quaternion.FromEulerAngles(45, 45, 45));
+
+            SolidMeshes.Add(Cube);
 
             var camera = new Camera();
             Vector3 cameraPos = new Vector3(-2, 2, 0);
@@ -40,7 +43,9 @@ namespace MarchingCubes
                 };
                 window.RenderFrame += (FrameEventArgs args) =>
                 {
-                    while(actionQueue.TryDequeue(out var action))
+                    Cube.transform = Matrix4.CreateRotationY((((DateTime.Now.Second + DateTime.Now.Millisecond / 1000.0f) / 60.0f * 4.0f) % 1.0f) * MathF.PI);
+
+                    while (actionQueue.TryDequeue(out var action))
                     {
                         action?.Invoke();
                     }
@@ -49,8 +54,11 @@ namespace MarchingCubes
                     GL.CullFace(TriangleFace.Back);
                     GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-                    Cube.transform = Matrix4.CreateRotationY((((DateTime.Now.Second + DateTime.Now.Millisecond / 1000.0f) / 60.0f * 4.0f)%1.0f) * MathF.PI);
-                    Cube.Draw(camera);
+
+                    foreach (var mesh in SolidMeshes)
+                    {
+                        mesh.Draw(camera);
+                    }
 
                     window.SwapBuffers();
                 };
