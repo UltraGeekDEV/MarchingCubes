@@ -4,6 +4,7 @@ using OpenTK.Windowing.Desktop;
 using OpenTK.Graphics.OpenGL4;
 using System.Collections.Concurrent;
 using MarchingCubes.Utils;
+using MarchingCubes.Shaders;
 
 namespace MarchingCubes
 {
@@ -13,6 +14,10 @@ namespace MarchingCubes
         static void Main(string[] args)
         {
             DebugUtils.debugOutput = Console.WriteLine;
+
+            Materials.materials[MaterialID.Solid] = new Shader("SolidMesh");
+
+
             var nativeSettings = new NativeWindowSettings()
             {
                 Size = new Vector2i(800, 600),
@@ -42,7 +47,7 @@ namespace MarchingCubes
                 GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
                 GL.BindVertexArray(0);
 
-                var shader = new Shader("SolidMesh");
+                var shader = Materials.materials[MaterialID.Solid];
 
                 window.RenderFrame += (FrameEventArgs args) =>
                 {
