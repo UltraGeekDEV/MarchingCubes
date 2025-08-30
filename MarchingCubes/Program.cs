@@ -13,10 +13,9 @@ namespace MarchingCubes
         public static ConcurrentQueue<Action> actionQueue = new ConcurrentQueue<Action>();
         static void Main(string[] args)
         {
-            DebugUtils.debugOutput = Console.WriteLine;
+            Init();
 
-            Materials.materials[MaterialID.Solid] = new Shader("SolidMesh");
-
+            var Cube = new Mesh(MaterialID.Solid, GetCube());
 
             var nativeSettings = new NativeWindowSettings()
             {
@@ -26,28 +25,6 @@ namespace MarchingCubes
 
             using (var window = new GameWindow(GameWindowSettings.Default, nativeSettings))
             {
-                // Simple triangle vertices
-                float[] vertices = {
-                -0.5f, -0.5f, 0.0f,
-                 0.5f, -0.5f, 0.0f,
-                 0.0f,  0.5f, 0.0f
-            };
-
-                int vao = GL.GenVertexArray();
-                int vbo = GL.GenBuffer();
-
-                GL.BindVertexArray(vao);
-
-                GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
-                GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices, BufferUsageHint.StaticDraw);
-
-                GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), 0);
-                GL.EnableVertexAttribArray(0);
-
-                GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
-                GL.BindVertexArray(0);
-
-                var shader = Materials.materials[MaterialID.Solid];
 
                 window.RenderFrame += (FrameEventArgs args) =>
                 {
@@ -60,15 +37,63 @@ namespace MarchingCubes
                     GL.ClearColor(0.1f, 0.2f, 0.3f, 1.0f);
                     GL.Clear(ClearBufferMask.ColorBufferBit);
 
-                    shader.SetActive();
-                    GL.BindVertexArray(vao);
-                    GL.DrawArrays(PrimitiveType.Triangles, 0, 3);
+                    Cube.Draw();
 
                     window.SwapBuffers();
                 };
 
                 window.Run();
             }
+        }
+
+        private static void Init()
+        {
+            DebugUtils.debugOutput = Console.WriteLine;
+
+            Materials.materials[MaterialID.Solid] = new Shader("SolidMesh");
+        }
+
+        static List<Triangle> GetCube()
+        {
+            List<Triangle> cube = new List<Triangle>();
+
+            Vector3[] v = new Vector3[]
+            {
+                new Vector3(-0.5f, -0.5f, -0.5f),
+                new Vector3( 0.5f, -0.5f, -0.5f),
+                new Vector3( 0.5f,  0.5f, -0.5f),
+                new Vector3(-0.5f,  0.5f, -0.5f),
+                new Vector3(-0.5f, -0.5f,  0.5f),
+                new Vector3( 0.5f, -0.5f,  0.5f),
+                new Vector3( 0.5f,  0.5f,  0.5f),
+                new Vector3(-0.5f,  0.5f,  0.5f)
+            };
+
+            // Front face
+            cube.Add(new Triangle(v[0], v[1], v[2]));
+            cube.Add(new Triangle(v[2], v[3], v[0]));
+
+            // Back face
+            cube.Add(new Triangle(v[5], v[4], v[7]));
+            cube.Add(new Triangle(v[7], v[6], v[5]));
+
+            // Left face
+            cube.Add(new Triangle(v[4], v[0], v[3]));
+            cube.Add(new Triangle(v[3], v[7], v[4]));
+
+            // Right face
+            cube.Add(new Triangle(v[1], v[5], v[6]));
+            cube.Add(new Triangle(v[6], v[2], v[1]));
+
+            // Top face
+            cube.Add(new Triangle(v[3], v[2], v[6]));
+            cube.Add(new Triangle(v[6], v[7], v[3]));
+
+            // Bottom face
+            cube.Add(new Triangle(v[4], v[5], v[1]));
+            cube.Add(new Triangle(v[1], v[0], v[4]));
+
+            return cube;
         }
     }
 }
