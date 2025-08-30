@@ -19,7 +19,7 @@ namespace MarchingCubes
         {
             Init();
 
-            var mesh = new Mesh(MaterialID.Solid, CPUMesher.GetTriangles(48));
+            var mesh = new Mesh(MaterialID.Solid, CPUMesher.GetTriangles(64));
 
             SolidMeshes.Add(mesh);
 

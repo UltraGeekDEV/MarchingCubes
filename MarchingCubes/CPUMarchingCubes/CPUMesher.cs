@@ -380,36 +380,60 @@ namespace MarchingCubes.CPUMarchingCubes
                 }
             }
 
-            int triCount = trianglesOut.Count;
-            float checkRange = 0.1f * trueVoxelSize;
-            for (int i = 0; i < triCount; i++)
+            Dictionary<(int,int,int),Vector3> normals = new Dictionary<(int, int, int), Vector3>();
+            int smoothing = 2;
+            float searchRange = 2f * trueVoxelSize;
+            for (int i = 0; i < trianglesOut.Count; i++)
             {
-                var triA = trianglesOut[i];
-                for (int j = 0; j < triCount; j++)
+                for (int x = -smoothing; x < smoothing+1; x++)
                 {
-                    var triB = trianglesOut[j];
-
-                    if (triB.IsTouching(triA.a, checkRange))
+                    for (int y = -smoothing; y < smoothing+1; y++)
                     {
-                        triA.normA += triB.normal;
-                    }
+                        for (int z = -smoothing; z < smoothing+1; z++)
+                        {
+                            var tri = trianglesOut[i];
+                            var key = GetKey(tri.a, searchRange);
+                            key.x += x;
+                            key.y += y;
+                            key.z += z;
+                            normals[key] = normals.GetValueOrDefault(key, Vector3.Zero) + tri.normal;
 
-                    if (triB.IsTouching(triA.b, checkRange))
-                    {
-                        triA.normB += triB.normal;
-                    }
+                            key = GetKey(tri.b, searchRange);
+                            key.x += x;
+                            key.y += y;
+                            key.z += z;
+                            normals[key] = normals.GetValueOrDefault(key, Vector3.Zero) + tri.normal;
 
-                    if (triB.IsTouching(triA.c, checkRange))
-                    {
-                        triA.normC += triB.normal;
+                            key = GetKey(tri.c, searchRange);
+                            key.x += x;
+                            key.y += y;
+                            key.z += z;
+                            normals[key] = normals.GetValueOrDefault(key, Vector3.Zero) + tri.normal;
+                        }
                     }
                 }
-                triA.normA.Normalize();
-                triA.normB.Normalize();
-                triA.normC.Normalize();
+            }
+
+            foreach (var item in normals.Keys)
+            {
+                normals[item] = normals[item].Normalized();
+            }
+
+            for (int i = 0; i < trianglesOut.Count; i++)
+            {
+                var tri = trianglesOut[i];
+
+                tri.normA = normals[GetKey(tri.a, searchRange)];
+                tri.normB = normals[GetKey(tri.b, searchRange)];
+                tri.normC = normals[GetKey(tri.c, searchRange)];
             }
 
             return trianglesOut;
+        }
+
+        private static (int x,int y, int z) GetKey(Vector3 pos,float resolution)
+        {
+            return ((int)(pos.X / resolution), (int)(pos.Y /resolution), (int)(pos.Z /resolution));
         }
     }
 }
