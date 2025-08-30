@@ -5,6 +5,8 @@ using OpenTK.Graphics.OpenGL4;
 using System.Collections.Concurrent;
 using MarchingCubes.Utils;
 using MarchingCubes.Shaders;
+using MarchingCubes.Rendering;
+using System.Drawing;
 
 namespace MarchingCubes
 {
@@ -16,6 +18,11 @@ namespace MarchingCubes
             Init();
 
             var Cube = new Mesh(MaterialID.Solid, GetCube());
+            Cube.transform = Matrix4.CreateFromQuaternion(Quaternion.FromEulerAngles(45, 45, 45));
+
+            var camera = new Camera();
+            Vector3 cameraPos = new Vector3(-2, 2, 0);
+            camera.transform = Matrix4.LookAt(cameraPos, Vector3.Zero, Vector3.UnitY);
 
             var nativeSettings = new NativeWindowSettings()
             {
@@ -25,19 +32,25 @@ namespace MarchingCubes
 
             using (var window = new GameWindow(GameWindowSettings.Default, nativeSettings))
             {
-
+                window.UpdateFrequency = 60;
+                window.Resize += (ResizeEventArgs) =>
+                {
+                    GL.Viewport(0,0,ResizeEventArgs.Width,ResizeEventArgs.Height);
+                    camera.SetPerspective(60,ResizeEventArgs.Size.X/(float)ResizeEventArgs.Size.Y);
+                };
                 window.RenderFrame += (FrameEventArgs args) =>
                 {
                     while(actionQueue.TryDequeue(out var action))
                     {
                         action?.Invoke();
                     }
-
-
                     GL.ClearColor(0.1f, 0.2f, 0.3f, 1.0f);
-                    GL.Clear(ClearBufferMask.ColorBufferBit);
+                    GL.Enable(EnableCap.DepthTest);
+                    GL.CullFace(TriangleFace.Back);
+                    GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-                    Cube.Draw();
+                    Cube.transform = Matrix4.CreateRotationY((((DateTime.Now.Second + DateTime.Now.Millisecond / 1000.0f) / 60.0f * 4.0f)%1.0f) * MathF.PI);
+                    Cube.Draw(camera);
 
                     window.SwapBuffers();
                 };

@@ -7,11 +7,11 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MarchingCubes
+namespace MarchingCubes.Rendering
 {
     public class Shader
     {
-        int shaderProgram;
+        public int shaderProgram;
 
         public Shader(string vertexShaderName, string fragmentShaderName)
         {
@@ -47,7 +47,7 @@ namespace MarchingCubes
                 GL.DeleteShader(vertexID);
             });
         }
-        public Shader(string ShaderName): this(ShaderName, ShaderName)
+        public Shader(string ShaderName) : this(ShaderName, ShaderName)
         { }
         public void SetActive()
         {

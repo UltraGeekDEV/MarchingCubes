@@ -4,7 +4,7 @@ using OpenTK.Mathematics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MarchingCubes
+namespace MarchingCubes.Rendering
 {
     public class Triangle
     {
