@@ -24,7 +24,7 @@ namespace MarchingCubes
             SolidMeshes.Add(mesh);
 
             var camera = new Camera();
-            Vector3 cameraPos = new Vector3(-2, 2, 0);
+            Vector3 cameraPos = new Vector3(1f, 1f, 0);
             camera.transform = Matrix4.LookAt(cameraPos, Vector3.Zero, Vector3.UnitY);
 
             var nativeSettings = new NativeWindowSettings()
@@ -43,7 +43,7 @@ namespace MarchingCubes
                 };
                 window.RenderFrame += (FrameEventArgs args) =>
                 {
-                    mesh.transform = Matrix4.CreateRotationY((((DateTime.Now.Second + DateTime.Now.Millisecond / 1000.0f) / 60.0f * 4.0f) % 1.0f) *2* MathF.PI);
+                    //mesh.transform = Matrix4.CreateRotationY((((DateTime.Now.Second + DateTime.Now.Millisecond / 1000.0f) / 60.0f * 4.0f) % 1.0f) *2* MathF.PI);
 
                     while (actionQueue.TryDequeue(out var action))
                     {

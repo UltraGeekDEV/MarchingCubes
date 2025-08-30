@@ -9,14 +9,14 @@ namespace MarchingCubes
 {
     public static class VoxelMeshGenerator
     {
-        public static byte[,,] GetVoxelMeshCPU(float resolution)
+        public static float[,,] GetVoxelMeshCPU(float resolution)
         {
             var voxelCount = (int)(1.0f / resolution);
             resolution = 1.0f / voxelCount;
 
             var center = Vector3.One * 0.5f;
 
-            var voxelMesh = new byte[voxelCount, voxelCount, voxelCount];
+            var voxelMesh = new float[voxelCount, voxelCount, voxelCount];
 
             for (int i = 0; i < voxelCount; i++)
             {
@@ -24,13 +24,19 @@ namespace MarchingCubes
                 {
                     for (int k = 0; k < voxelCount; k++)
                     {
-                        voxelMesh[i, j, k] = (byte)((center - new Vector3(i, j, k) * resolution).Length < 0.4f ? 1 : 0);
+                        var vec = new Vector3(i, j, k) * resolution - center;
+                        voxelMesh[i, j, k] = MathF.Max(MathF.Min(CylinderSDF(vec,0.4f,0.8f)*20,1),0);
                     }
                 }
             }
 
 
             return voxelMesh;
+        }
+        static float CylinderSDF(Vector3 p, float radius, float height)
+        {
+            Vector2 d = new Vector2(MathF.Sqrt(p.X * p.X + p.Z * p.Z) - radius, MathF.Abs(p.Y) - height * 0.5f);
+            return MathF.Min(MathF.Max(d.X, d.Y), 0.0f) + new Vector2(MathF.Max(d.X, 0.0f), MathF.Max(d.Y, 0.0f)).Length;
         }
     }
 }

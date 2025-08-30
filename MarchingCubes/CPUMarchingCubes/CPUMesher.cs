@@ -10,6 +10,7 @@ namespace MarchingCubes.CPUMarchingCubes
 {
     public class CPUMesher
     {
+        static float isoValue = 0.5f;
         public static List<Triangle> GetTriangles(int voxelsPerEdge)
         {
             var trianglesOut = new List<Triangle>();
@@ -319,6 +320,18 @@ namespace MarchingCubes.CPUMarchingCubes
                 new Vector3(1, 1, 0) 
             };
 
+            (int x, int y, int z)[] cornerOffsets = new (int, int, int)[]
+            {
+                (-1, -1, -1),
+                (-1, -1,  0),
+                ( 0, -1,  0),
+                ( 0, -1, -1),
+                (-1,  0, -1),
+                (-1,  0,  0),
+                ( 0,  0,  0),
+                ( 0,  0, -1),
+            };
+
             (int a, int b)[] edges = new (int a, int b)[]
             {
                 (0,1),
@@ -346,14 +359,14 @@ namespace MarchingCubes.CPUMarchingCubes
                     for (int k = 1; k < edgeLength; k++)
                     {
                         var cubeindex = 0;
-                        if (voxels[i-1,j-1,k-1]     != 0) cubeindex |= 1;
-                        if (voxels[i - 1, j - 1, k] != 0) cubeindex |= 2;
-                        if (voxels[i, j - 1, k]     != 0) cubeindex |= 4;
-                        if (voxels[i, j - 1, k-1]   != 0) cubeindex |= 8;
-                        if (voxels[i-1,j,k-1]     != 0) cubeindex |= 16;
-                        if (voxels[i - 1, j, k] != 0) cubeindex |= 32;
-                        if (voxels[i, j, k]     != 0) cubeindex |= 64;
-                        if (voxels[i, j, k - 1] != 0) cubeindex |= 128;
+                        if (voxels[i-1,j-1,k-1]     > isoValue) cubeindex |= 1;
+                        if (voxels[i - 1, j - 1, k] > isoValue) cubeindex |= 2;
+                        if (voxels[i, j - 1, k]     > isoValue) cubeindex |= 4;
+                        if (voxels[i, j - 1, k-1]   > isoValue) cubeindex |= 8;
+                        if (voxels[i-1,j,k-1]       > isoValue) cubeindex |= 16;
+                        if (voxels[i - 1, j, k]     > isoValue) cubeindex |= 32;
+                        if (voxels[i, j, k]         > isoValue) cubeindex |= 64;
+                        if (voxels[i, j, k - 1]     > isoValue) cubeindex |= 128;
 
                         int edgeMask = edgeTable[cubeindex];
                         var vertexList = new Vector3[12];
@@ -364,7 +377,11 @@ namespace MarchingCubes.CPUMarchingCubes
                             if ((edgeMask & 1<<x) != 0)
                             {
                                 var edge = edges[x];
-                                vertexList[x] = ((corners[edge.a] + corners[edge.b])* 0.5f - Vector3.One+new Vector3(i,j,k)) * trueVoxelSize -Vector3.One*0.5f;
+                                var offsetA = cornerOffsets[edge.a];
+                                var offsetB = cornerOffsets[edge.b];
+                                var A = voxels[i + offsetA.x, j + offsetA.y, k + offsetA.z];
+                                var B = voxels[i + offsetB.x, j + offsetB.y, k + offsetB.z];
+                                vertexList[x] = VertexInterp(corners[edge.a] * trueVoxelSize, corners[edge.b] * trueVoxelSize, A,B) + new Vector3(i,j,k) * trueVoxelSize - Vector3.One*0.5f;
                             }
                         }
 
@@ -380,38 +397,19 @@ namespace MarchingCubes.CPUMarchingCubes
                 }
             }
 
-            Dictionary<(int,int,int),Vector3> normals = new Dictionary<(int, int, int), Vector3>();
-            int smoothing = 2;
-            float searchRange = 2f * trueVoxelSize;
+            Dictionary<(int, int, int), Vector3> normals = new Dictionary<(int, int, int), Vector3>();
+            float searchRange = 0.5f * trueVoxelSize;
             for (int i = 0; i < trianglesOut.Count; i++)
             {
-                for (int x = -smoothing; x < smoothing+1; x++)
-                {
-                    for (int y = -smoothing; y < smoothing+1; y++)
-                    {
-                        for (int z = -smoothing; z < smoothing+1; z++)
-                        {
-                            var tri = trianglesOut[i];
-                            var key = GetKey(tri.a, searchRange);
-                            key.x += x;
-                            key.y += y;
-                            key.z += z;
-                            normals[key] = normals.GetValueOrDefault(key, Vector3.Zero) + tri.normal;
+                var tri = trianglesOut[i];
+                var key = GetKey(tri.a, searchRange);
+                normals[key] = normals.GetValueOrDefault(key, Vector3.Zero) + tri.normal;
 
-                            key = GetKey(tri.b, searchRange);
-                            key.x += x;
-                            key.y += y;
-                            key.z += z;
-                            normals[key] = normals.GetValueOrDefault(key, Vector3.Zero) + tri.normal;
+                key = GetKey(tri.b, searchRange);
+                normals[key] = normals.GetValueOrDefault(key, Vector3.Zero) + tri.normal;
 
-                            key = GetKey(tri.c, searchRange);
-                            key.x += x;
-                            key.y += y;
-                            key.z += z;
-                            normals[key] = normals.GetValueOrDefault(key, Vector3.Zero) + tri.normal;
-                        }
-                    }
-                }
+                key = GetKey(tri.c, searchRange);
+                normals[key] = normals.GetValueOrDefault(key, Vector3.Zero) + tri.normal;
             }
 
             foreach (var item in normals.Keys)
@@ -430,8 +428,24 @@ namespace MarchingCubes.CPUMarchingCubes
 
             return trianglesOut;
         }
+        static Vector3 VertexInterp(Vector3 p1, Vector3 p2,float valp1,float valp2)
+        {
+            float mu;
+            Vector3 p = new Vector3();
 
-        private static (int x,int y, int z) GetKey(Vector3 pos,float resolution)
+            if (MathF.Abs(isoValue - valp1) < 0.001f) return (p1);
+            if (MathF.Abs(isoValue - valp2) < 0.001f) return (p2);
+            if (MathF.Abs(valp2 - valp1) < 0.001f) return (p1);
+            mu = (isoValue - valp1) / (valp2 - valp1);
+
+            p.X = p1.X + mu * (p2.X - p1.X);
+            p.Y = p1.Y + mu * (p2.Y - p1.Y);
+            p.Z = p1.Z + mu * (p2.Z - p1.Z);
+        
+           return(p);
+        }
+
+    private static (int x,int y, int z) GetKey(Vector3 pos,float resolution)
         {
             return ((int)(pos.X / resolution), (int)(pos.Y /resolution), (int)(pos.Z /resolution));
         }
