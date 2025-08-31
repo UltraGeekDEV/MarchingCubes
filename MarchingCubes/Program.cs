@@ -19,7 +19,7 @@ namespace MarchingCubes
         {
             Init();
 
-            var mesh = new Mesh(MaterialID.Solid, CPUMesher.GetTriangles(64));
+            var mesh = new Mesh(MaterialID.Solid, CPUMesher.GetTriangles(128));
 
             SolidMeshes.Add(mesh);
 
@@ -43,7 +43,7 @@ namespace MarchingCubes
                 };
                 window.RenderFrame += (FrameEventArgs args) =>
                 {
-                    //mesh.transform = Matrix4.CreateRotationY((((DateTime.Now.Second + DateTime.Now.Millisecond / 1000.0f) / 60.0f * 4.0f) % 1.0f) *2* MathF.PI);
+                    mesh.transform = Matrix4.CreateRotationY((((DateTime.Now.Second + DateTime.Now.Millisecond / 1000.0f) / 60.0f * 4.0f) % 1.0f) *2* MathF.PI);
 
                     while (actionQueue.TryDequeue(out var action))
                     {
@@ -51,7 +51,7 @@ namespace MarchingCubes
                     }
                     GL.ClearColor(0.1f, 0.2f, 0.3f, 1.0f);
                     GL.Enable(EnableCap.DepthTest);
-                    GL.CullFace(TriangleFace.Back);
+                    //GL.CullFace(TriangleFace.Back);
                     GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
 

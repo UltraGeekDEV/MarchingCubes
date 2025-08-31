@@ -43,7 +43,7 @@ namespace MarchingCubes.Rendering
 
         public Vector3 GetNormal()
         {
-            return Vector3.Cross(a - b, a - c);
+            return Vector3.Cross(a - b, a - c).Normalized();
         }
     }
 }

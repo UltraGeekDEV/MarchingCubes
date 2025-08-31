@@ -349,14 +349,17 @@ namespace MarchingCubes.CPUMarchingCubes
             };
 
             var voxels = VoxelMeshGenerator.GetVoxelMeshCPU(1.0f / voxelsPerEdge);
+            var dualContouring = new Vector3?[voxels.GetLength(0), voxels.GetLength(1), voxels.GetLength(2)];
 
-            int edgeLength = voxels.GetLength(0);
-            float trueVoxelSize = 1.0f/edgeLength;
-            for (int i = 1; i < edgeLength; i++)
+            int lenX = voxels.GetLength(0);
+            int lenY = voxels.GetLength(1);
+            int lenZ = voxels.GetLength(2);
+            float trueVoxelSize = 1.0f/ lenX;
+            for (int i = 1; i < lenX; i++)
             {
-                for (int j = 1; j < edgeLength; j++)
+                for (int j = 1; j < lenY; j++)
                 {
-                    for (int k = 1; k < edgeLength; k++)
+                    for (int k = 1; k < lenZ; k++)
                     {
                         var cubeindex = 0;
                         if (voxels[i-1,j-1,k-1]     > isoValue) cubeindex |= 1;
@@ -370,7 +373,9 @@ namespace MarchingCubes.CPUMarchingCubes
 
                         int edgeMask = edgeTable[cubeindex];
                         var vertexList = new Vector3[12];
-                        var normalList = new Vector3[12];
+                        var M = new float[12, 3];
+                        var Mt = new float[3, 12];
+                        var b = new float[12];
 
                         for (int x = 0; x < 12; x++)
                         {
@@ -379,19 +384,274 @@ namespace MarchingCubes.CPUMarchingCubes
                                 var edge = edges[x];
                                 var offsetA = cornerOffsets[edge.a];
                                 var offsetB = cornerOffsets[edge.b];
-                                var A = voxels[i + offsetA.x, j + offsetA.y, k + offsetA.z];
-                                var B = voxels[i + offsetB.x, j + offsetB.y, k + offsetB.z];
-                                vertexList[x] = VertexInterp(corners[edge.a] * trueVoxelSize, corners[edge.b] * trueVoxelSize, A,B) + new Vector3(i,j,k) * trueVoxelSize - Vector3.One*0.5f;
+                                (int x,int y, int z) IDA = (i + offsetA.x,j +offsetA.y,k + offsetA.z);
+                                (int x, int y, int z) IDB = (i + offsetB.x, j + offsetB.y, k + offsetB.z);
+                                var A = voxels[IDA.x, IDA.y, IDA.z];
+                                var B = voxels[IDB.x, IDB.y, IDB.z];
+                                //vertexList[x] = (VertexInterp(corners[edge.a], corners[edge.b] , A,B) + new Vector3(i,j,k)) * trueVoxelSize - Vector3.One*0.5f;
+                                vertexList[x] = VertexInterp(corners[edge.a], corners[edge.b], A, B);
+                                float ratio = (vertexList[x] - corners[edge.a] * trueVoxelSize).Length / trueVoxelSize;
+                                Vector3 normal = VertexInterp(GetGradient(IDA, voxels), GetGradient(IDB, voxels),A,B).Normalized();
+
+                                //Vector3 normal = corners[edge.b] - corners[edge.a];
+                                //{
+                                //    var temp = -normal.Y;
+                                //    normal.Y = normal.X;
+                                //    normal.X = temp;
+                                //}
+
+                                M[x, 0] = normal.X;
+                                M[x, 1] = normal.Y;
+                                M[x, 2] = normal.Z;
+
+                                Mt[0,x] = normal.X;
+                                Mt[1,x] = normal.Y;
+                                Mt[2,x] = normal.Z;
+
+                                b[x] = Vector3.Dot(normal, vertexList[x] );
                             }
                         }
 
-                        for (int x = 0; triTable[cubeindex,x] != -1 ; x+=3)
+                        var M2 = new float[3,3];
+
+
+                        for (int y1 = 0; y1 < 3; y1++)
                         {
-                            trianglesOut.Add(new Triangle(
-                                vertexList[triTable[cubeindex,x]],
-                                vertexList[triTable[cubeindex,x+1]],
-                                vertexList[triTable[cubeindex,x+2]]
-                                ));
+                            for (int y2 = 0; y2 < 3; y2++)
+                            {
+                                M2[y1, y2] += 1e-4f;
+                                for (int x = 0; x < 12; x++)
+                                {
+                                    M2[y1, y2] += M[x, y2] * Mt[y1, x];
+                                }
+                            }
+                        }
+
+                        var b2 = new float[3];
+
+                        for (int x = 0; x < 12; x++)
+                        {
+                            for (int y = 0; y < 3; y++)
+                            {
+                                b2[y] += b[x] * Mt[y, x];
+                            }
+                        }
+
+                        var system = new Vector4[3];
+
+                        for (int x = 0; x < 3; x++)
+                        {
+                            system[x] = new Vector4(M2[x, 0], M2[x, 1], M2[x, 2], b2[x]);
+                        }
+
+                        Func<Vector3?> avgP = () =>
+                        {
+                            var vOut = Vector3.Zero;
+                            int count = 0;
+
+                            for (int x = 0; x < 12; x++)
+                            {
+                                if ((edgeMask & 1 << x) != 0)
+                                {
+                                    vOut += vertexList[x];
+                                    count++;
+                                }
+                            }
+                            if (count == 0)
+                            {
+                                return null;
+                            }
+                            return vOut / count;
+                        };
+
+                        float X;
+                        float Y;
+                        float Z;
+
+                        int bestRow = 0;
+                        float bestAbs = MathF.Abs(system[0].X);
+                        for (int r = 1; r < 3; r++)
+                        {
+                            float a = MathF.Abs(system[r].X);
+                            if (a > bestAbs) 
+                            { 
+                                bestAbs = a; 
+                                bestRow = r; 
+                            }
+                        }
+                        if (bestRow != 0)
+                        {
+                            var tmp = system[0]; 
+                            system[0] = system[bestRow]; 
+                            system[bestRow] = tmp;
+                        }
+
+                        if (Math.Abs(system[0].X) > 1e-6f)
+                        {
+                            system[1] = system[1] - system[0] * (system[1].X / system[0].X);
+                            system[2] = system[2] - system[0] * (system[2].X / system[0].X);
+
+                            if (MathF.Abs(system[1].Y) < MathF.Abs(system[2].Y))
+                            {
+                                var temp = system[1];
+                                system[1] = system[2];
+                                system[2] = temp;
+                            }
+
+                            if (Math.Abs(system[1].Y) > 1e-6f)
+                            {
+                                system[2] = system[2] - system[1] * (system[2].Y / system[1].Y);
+
+                                Z = system[2].W / system[2].Z;
+                                Y = (system[1].W - system[1].Z * Z) / system[1].Y;
+                                X = (system[0].W - system[0].Y * Y - system[0].Z * Z) / system[0].X;
+                            }
+                            else
+                            {
+                                continue;
+                                var p = avgP();
+                                if (p is null)
+                                {
+                                    continue;
+                                }
+                                Z = p.Value.Z;
+                                Y = p.Value.Y;
+                                X = p.Value.X;
+                            }
+                        }
+                        else
+                        {
+                            continue;
+                            var p = avgP();
+                            if (p is null)
+                            {
+                                continue;
+                            }
+                            Z = p.Value.Z;
+                            Y = p.Value.Y;
+                            X = p.Value.X;
+                        }
+
+                        Z = MathF.Min(MathF.Max(Z, 0), 1);
+                        X = MathF.Min(MathF.Max(X, 0), 1);
+                        Y = MathF.Min(MathF.Max(Y, 0), 1);
+
+                        dualContouring[i,j,k] = (new Vector3(X, Y, Z) + new Vector3(i, j, k)) *trueVoxelSize - Vector3.One * 0.5f;
+                    }
+                }
+            }
+
+            for (int i = 0; i < lenX-1; i++)
+            {
+                for (int j = 0; j < lenY-1; j++)
+                {
+                    for (int k = 0; k < lenZ - 1; k++)
+                    {
+                        var v0 = dualContouring[i, j, k];
+
+                        if(v0 is null)
+                        {
+                            continue;
+                        }
+
+                        ////Z loop
+                        {
+                            var v1 = dualContouring[i + 1, j, k];
+                            var v2 = dualContouring[i, j + 1, k];
+                            var v3 = dualContouring[i + 1, j + 1, k];
+
+                            if (!(v1 is null || v2 is null || v3 is null))
+                            {
+                                var tri1 = new Triangle(v0.Value, v1.Value, v2.Value);
+                                var tri2 = new Triangle(v1.Value, v3.Value, v2.Value);
+
+                                var gradient = GetGradient((i, j, k), voxels);
+
+                                if (Vector3.Dot(tri1.GetNormal(), gradient) < 0)
+                                {
+                                    var swap = tri1.a;
+                                    tri1.a = tri1.b;
+                                    tri1.b = swap;
+                                    tri1.normal = tri1.GetNormal();
+                                }
+
+                                if (Vector3.Dot(tri2.GetNormal(), gradient) < 0)
+                                {
+                                    var swap = tri2.a;
+                                    tri2.a = tri2.b;
+                                    tri2.b = swap;
+                                    tri2.normal = tri2.GetNormal();
+                                }
+
+                                trianglesOut.Add(tri1);
+                                trianglesOut.Add(tri2);
+                            }
+                        }
+                        //Y loop
+                        {
+                            var v1 = dualContouring[i + 1, j, k];
+                            var v2 = dualContouring[i, j , k + 1];
+                            var v3 = dualContouring[i + 1, j, k + 1];
+
+                            if (!(v1 is null || v2 is null || v3 is null))
+                            {
+                                var tri1 = new Triangle(v0.Value, v1.Value, v2.Value);
+                                var tri2 = new Triangle(v1.Value, v3.Value, v2.Value);
+
+                                var gradient = GetGradient((i, j, k), voxels);
+
+                                if (Vector3.Dot(tri1.GetNormal(), gradient) < 0)
+                                {
+                                    var swap = tri1.a;
+                                    tri1.a = tri1.b;
+                                    tri1.b = swap;
+                                    tri1.normal = tri1.GetNormal();
+                                }
+
+                                if (Vector3.Dot(tri2.GetNormal(), gradient) < 0)
+                                {
+                                    var swap = tri2.a;
+                                    tri2.a = tri2.b;
+                                    tri2.b = swap;
+                                    tri2.normal = tri2.GetNormal();
+                                }
+
+                                trianglesOut.Add(tri1);
+                                trianglesOut.Add(tri2);
+                            }
+                        }
+                        //X loop
+                        {
+                            var v1 = dualContouring[i , j + 1, k];
+                            var v2 = dualContouring[i, j, k + 1];
+                            var v3 = dualContouring[i , j + 1, k + 1];
+
+                            if (!(v1 is null || v2 is null || v3 is null))
+                            {
+                                var tri1 = new Triangle(v0.Value, v1.Value, v2.Value);
+                                var tri2 = new Triangle(v1.Value, v3.Value, v2.Value);
+
+                                var gradient = GetGradient((i, j, k), voxels);
+
+                                if (Vector3.Dot(tri1.GetNormal(), gradient) < 0)
+                                {
+                                    var swap = tri1.a;
+                                    tri1.a = tri1.b;
+                                    tri1.b = swap;
+                                    tri1.normal = tri1.GetNormal();
+                                }
+
+                                if (Vector3.Dot(tri2.GetNormal(), gradient) < 0)
+                                {
+                                    var swap = tri2.a;
+                                    tri2.a = tri2.b;
+                                    tri2.b = swap;
+                                    tri2.normal = tri2.GetNormal();
+                                }
+
+                                trianglesOut.Add(tri1);
+                                trianglesOut.Add(tri2);
+                            }
                         }
                     }
                 }
@@ -428,6 +688,50 @@ namespace MarchingCubes.CPUMarchingCubes
 
             return trianglesOut;
         }
+        private static Vector3 GetSobelGradient(int x, int y, int z, float[,,] voxels)
+        {
+            int lenX = voxels.GetLength(0);
+            int lenY = voxels.GetLength(1);
+            int lenZ = voxels.GetLength(2);
+
+            float dx = 0, dy = 0, dz = 0;
+
+            // Iterate over neighbors in a 3x3x3 cube
+            for (int i = -2; i <= 2; i++)
+            {
+                int xi = Math.Clamp(x + i, 0, lenX - 1);
+                for (int j = -2; j <= 2; j++)
+                {
+                    int yj = Math.Clamp(y + j, 0, lenY - 1);
+                    for (int k = -2; k <= 2; k++)
+                    {
+                        int zk = Math.Clamp(z + k, 0, lenZ - 1);
+
+                        float val = voxels[xi, yj, zk];
+
+                        // Sobel weights: central differences along each axis
+                        dx += val * i;       // weight -1,0,1 along x
+                        dy += val * j;       // weight -1,0,1 along y
+                        dz += val * k;       // weight -1,0,1 along z
+                    }
+                }
+            }
+
+            Vector3 grad = new Vector3(dx, dy, dz);
+            return grad.LengthSquared > 1e-8 ? Vector3.Normalize(grad) : Vector3.UnitZ;
+        }
+        private static Vector3 GetGradient((int x, int y, int z) id, float[,,] voxels)
+        {
+            //int lenX = voxels.GetLength(0)-1; 
+            //int lenY = voxels.GetLength(1)-1; 
+            //int lenZ = voxels.GetLength(2)-1;
+
+            //return -new Vector3( voxels[Math.Min(id.x + 1,lenX), id.y, id.z] - voxels[Math.Max(id.x - 1,0), id.y, id.z]
+            //                   ,voxels[id.x , Math.Min(id.y + 1,lenY), id.z] - voxels[id.x , Math.Max(id.y - 1,0), id.z]
+            //                   ,voxels[id.x, id.y, Math.Min(id.z + 1,lenZ)] - voxels[id.x, id.y, Math.Max(id.z - 1,0)]).Normalized();
+            return GetSobelGradient(id.x,id.y,id.z,voxels);
+        }
+
         static Vector3 VertexInterp(Vector3 p1, Vector3 p2,float valp1,float valp2)
         {
             float mu;
