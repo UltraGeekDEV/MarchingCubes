@@ -25,7 +25,8 @@ namespace MarchingCubes
                     for (int k = 0; k < voxelCount; k++)
                     {
                         var vec = new Vector3(i, j, k) * resolution - center;
-                        voxelMesh[i, j, k] = (MathF.Sqrt(vec.X * vec.X + vec.Z * vec.Z) < 0.4f) && (MathF.Abs(vec.Y) < 0.4f) ? 1.0f : 0.5f;
+                        //voxelMesh[i, j, k] = (MathF.Sqrt(vec.X * vec.X + vec.Z * vec.Z) < 0.4f) && (MathF.Abs(vec.Y) < 0.4f) ? 0.0f : 1.0f;
+                        voxelMesh[i, j, k] = CylinderSDF(vec,0.4f,0.81f)*30;
                     }
                 }
             }

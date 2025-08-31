@@ -19,13 +19,13 @@ namespace MarchingCubes
         {
             Init();
 
-            var mesh = new Mesh(MaterialID.Solid, CPUMesher.GetTriangles(128));
+            var mesh = new Mesh(MaterialID.Solid, CPUMesher.GetTriangles(64));
 
             SolidMeshes.Add(mesh);
 
             var camera = new Camera();
             Vector3 cameraPos = new Vector3(1f, 1f, 0);
-            camera.transform = Matrix4.LookAt(cameraPos, Vector3.Zero, Vector3.UnitY);
+            camera.transform = Matrix4.LookAt(cameraPos, new Vector3(0f,0,0f), Vector3.UnitY);
 
             var nativeSettings = new NativeWindowSettings()
             {
@@ -51,7 +51,7 @@ namespace MarchingCubes
                     }
                     GL.ClearColor(0.1f, 0.2f, 0.3f, 1.0f);
                     GL.Enable(EnableCap.DepthTest);
-                    //GL.CullFace(TriangleFace.Back);
+                    GL.CullFace(TriangleFace.Back);
                     GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
 
